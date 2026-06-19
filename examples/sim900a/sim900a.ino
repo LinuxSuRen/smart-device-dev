@@ -35,6 +35,7 @@
 
 SoftwareSerial sim900(SIM900_RX, SIM900_TX);
 
+String sim900Response = "";
 String phoneNumber = "";
 String smsText = "";
 unsigned long lastPing = 0;
@@ -295,8 +296,6 @@ void sim900SendSMS(String number, String text) {
 }
 
 // ===================== 响应缓冲区 =====================
-String sim900Response = "";
-
 bool sim900WaitResponse(unsigned long timeout, const __FlashStringHelper *keyword) {
   sim900Response = "";
   unsigned long start = millis();
