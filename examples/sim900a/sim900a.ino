@@ -69,8 +69,6 @@ void setup() {
     Serial.println(F(" bps"));
     Serial.println();
   } else {
-    Serial.println(F("[FAIL] Module not responding."));
-    Serial.println(F("Check wiring, power supply (5V/2A), and SIM card."));
     while (1) {
       digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
       delay(200);
@@ -142,14 +140,21 @@ void loop() {
 
 // ===================== 自动波特率检测 =====================
 long sim900AutoBaud() {
+  bool everReceived = false;
+
   for (int b = 0; b < BAUD_COUNT; b++) {
     sim900.begin(BAUD_RATES[b]);
     delay(200);
 
-    // 清空缓冲区
-    while (sim900.available()) sim900.read();
+    // 检查是否有任何数据流入（哪怕乱码）
+    unsigned long t = millis();
+    while (millis() - t < 300) {
+      if (sim900.available()) {
+        everReceived = true;
+        while (sim900.available()) sim900.read();
+      }
+    }
 
-    // 尝试不同次数，有的模块需要同步波特率
     for (int attempt = 0; attempt < 3; attempt++) {
       sim900.println(F("AT"));
       if (sim900WaitResponse(500, F("OK"))) {
@@ -161,6 +166,27 @@ long sim900AutoBaud() {
 
     sim900.end();
     delay(100);
+  }
+
+  // ============ 诊断输出 ============
+  Serial.println();
+
+  if (everReceived) {
+    Serial.println(F("[FAIL] Module not responding."));
+    Serial.println(F("Module IS powered but no valid AT response."));
+    Serial.println(F("Possible causes:"));
+    Serial.println(F("  1. TX/RX swapped: try swapping D2 <-> D3"));
+    Serial.println(F("  2. Baud rate not in tested list"));
+    Serial.println(F("  3. SIM not inserted or faulty"));
+    Serial.println(F("  4. Module still booting: wait 3-5s retry"));
+  } else {
+    Serial.println(F("[FAIL] Module not responding."));
+    Serial.println(F("No data received from module at all."));
+    Serial.println(F("Possible causes:"));
+    Serial.println(F("  1. Power not connected or insufficient (need 5V/2A)"));
+    Serial.println(F("  2. GND not shared with Arduino"));
+    Serial.println(F("  3. TX line disconnected (SIM900A TXD -> D2)"));
+    Serial.println(F("  4. Wrong pins: check D2/D3 assignment"));
   }
   return -1;
 }
