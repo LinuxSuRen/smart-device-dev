@@ -15,7 +15,8 @@
  *  共地：模块 GND 必须与 Arduino GND 相连。
  *
  * ============== 串口输出 ==============
- *  9600bps，上电后打印模块信息，之后循环等待串口 AT 指令
+ *  自动检测 SIM900A 波特率 (9600/115200/19200/38400/57600/4800/2400)
+ *  Arduino 串口监视器请设为 9600 bps
  *
  * ============== 拨打电话 ==============
  *  通过串口发送命令拨打电话：
@@ -40,20 +41,34 @@ String phoneNumber = "";
 String smsText = "";
 unsigned long lastPing = 0;
 
+const long BAUD_RATES[] = {9600, 115200, 19200, 38400, 57600, 4800, 2400};
+const int  BAUD_COUNT   = sizeof(BAUD_RATES) / sizeof(BAUD_RATES[0]);
+long sim900Baud = 9600;
+
 void setup() {
   Serial.begin(9600);
-  sim900.begin(9600);
+
+  // 等待串口就绪（部分开发板需要），最多等3秒
+  for (int i = 0; i < 30; i++) {
+    if (Serial) break;
+    delay(100);
+  }
 
   Serial.println(F("\n=============================="));
   Serial.println(F("  SIM900A GSM/GPRS Module"));
   Serial.println(F("=============================="));
-  Serial.println(F("Initializing module..."));
-  Serial.println();
 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
 
-  if (!sim900ATTest()) {
+  long detected = sim900AutoBaud();
+  if (detected > 0) {
+    sim900Baud = detected;
+    Serial.print(F("Module @ "));
+    Serial.print(sim900Baud);
+    Serial.println(F(" bps"));
+    Serial.println();
+  } else {
     Serial.println(F("[FAIL] Module not responding."));
     Serial.println(F("Check wiring, power supply (5V/2A), and SIM card."));
     while (1) {
@@ -123,6 +138,31 @@ void loop() {
     sim900ATTest();
     lastPing = millis();
   }
+}
+
+// ===================== 自动波特率检测 =====================
+long sim900AutoBaud() {
+  for (int b = 0; b < BAUD_COUNT; b++) {
+    sim900.begin(BAUD_RATES[b]);
+    delay(200);
+
+    // 清空缓冲区
+    while (sim900.available()) sim900.read();
+
+    // 尝试不同次数，有的模块需要同步波特率
+    for (int attempt = 0; attempt < 3; attempt++) {
+      sim900.println(F("AT"));
+      if (sim900WaitResponse(500, F("OK"))) {
+        sim900Flush();
+        return BAUD_RATES[b];
+      }
+      delay(100);
+    }
+
+    sim900.end();
+    delay(100);
+  }
+  return -1;
 }
 
 // ===================== AT 测试 =====================
