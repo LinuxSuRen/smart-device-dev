@@ -13,6 +13,8 @@
  *   TMP1826 VDD  -> Arduino 5V (或 3.3V)
  *   TMP1826 GND  -> Arduino GND
  *   TMP1826 DQ   -> Arduino D2 (使用内部上拉, 无需外接电阻)
+ *   5161BS COM(3,8) -> 100Ω 电阻 -> Arduino 5V    ← 共用限流电阻
+ *   5161BS a~g     -> Arduino D3~D7, D9~D10       (段脚直连)
  *
  * 外部供电方式:
  *   1. DC 圆口 (7-12V)  -> 板载稳压到 5V
@@ -33,6 +35,29 @@
 #define PREHEAT_SECONDS  30
 #define ONE_WIRE_BUS     2
 
+#define SEG_A  3
+#define SEG_B  4
+#define SEG_C  5
+#define SEG_D  6
+#define SEG_E  7
+#define SEG_F  9
+#define SEG_G  10
+
+const uint8_t segPins[7] = {SEG_A, SEG_B, SEG_C, SEG_D, SEG_E, SEG_F, SEG_G};
+// 共阳极: LOW=亮, HIGH=灭  顺序: a,b,c,d,e,f,g
+const uint8_t digitPattern[10][7] = {
+  {0,0,0,0,0,0,1}, // 0
+  {1,0,0,1,1,1,1}, // 1
+  {0,0,1,0,0,1,0}, // 2
+  {0,0,0,0,1,1,0}, // 3
+  {1,0,0,1,1,0,0}, // 4
+  {0,1,0,0,1,0,0}, // 5
+  {0,1,0,0,0,0,0}, // 6
+  {0,0,0,1,1,1,1}, // 7
+  {0,0,0,0,0,0,0}, // 8
+  {0,0,0,0,1,0,0}, // 9
+};
+
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
@@ -46,6 +71,12 @@ void setup() {
 
   pinMode(ONE_WIRE_BUS, INPUT_PULLUP);
   sensors.begin();
+
+  for (int i = 0; i < 7; i++) {
+    pinMode(segPins[i], OUTPUT);
+    digitalWrite(segPins[i], HIGH);
+  }
+  displayDigit(0);
 
   // --- 自检: 3 声 ---
   for (int i = 0; i < 3; i++) {
@@ -140,9 +171,20 @@ void loop() {
       Serial.print("  Temp:");
       Serial.print(tempC);
       Serial.println(" C");
+      int d = (int)tempC % 10;
+      if (d < 0) d = 0;
+      displayDigit(d);
     } else {
       Serial.println("  Temp: N/A");
+      displayDigit(0);
     }
     lastPrint = millis();
+  }
+}
+
+void displayDigit(int d) {
+  if (d < 0 || d > 9) return;
+  for (int i = 0; i < 7; i++) {
+    digitalWrite(segPins[i], digitPattern[d][i]);
   }
 }
