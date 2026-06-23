@@ -1,5 +1,5 @@
 /*
- * FC-22 气体传感器 + 蜂鸣器 浓度分级报警 (独立运行版)
+ * FC-22 气体传感器 + 蜂鸣器 浓度分级报警 + TMP1826 (V182) 温度传感器
  *
  * 供电要求: 5V, 建议 >= 500mA (USB 充电头即可)
  *
@@ -10,6 +10,9 @@
  *   FC-22 DO   -> 不接
  *   蜂鸣器 +   -> Arduino D8
  *   蜂鸣器 -   -> GND
+ *   TMP1826 VDD  -> Arduino 5V (或 3.3V)
+ *   TMP1826 GND  -> Arduino GND
+ *   TMP1826 DQ   -> Arduino D2 (使用内部上拉, 无需外接电阻)
  *
  * 外部供电方式:
  *   1. DC 圆口 (7-12V)  -> 板载稳压到 5V
@@ -17,10 +20,21 @@
  *   3. 5V 引脚直接供电   -> 必须是稳压 5V, 跳过板载稳压器
  *   ❌ 不建议: 9V 方块电池 (电流太小, 带不动传感器)
  *   (DO 引脚已弃用，只靠 AO 模拟值判断，避免电位器误触发)
+ *
+ * 依赖库 (通过 Arduino 库管理器安装):
+ *   - OneWire  (by Jim Studt)
+ *   - DallasTemperature  (by Miles Burton)
  */
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
 #define BUZZER_PIN       8
 #define GAS_AO_PIN      A1
 #define PREHEAT_SECONDS  30
+#define ONE_WIRE_BUS     2
+
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
 
 int baseline = 0;
 
@@ -28,7 +42,10 @@ void setup() {
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
   Serial.begin(9600);
-  Serial.println("FC-22 Gas Alarm");
+  Serial.println("FC-22 Gas Alarm + TMP1826 Temp Sensor");
+
+  pinMode(ONE_WIRE_BUS, INPUT_PULLUP);
+  sensors.begin();
 
   // --- 自检: 3 声 ---
   for (int i = 0; i < 3; i++) {
@@ -109,10 +126,22 @@ void loop() {
     Serial.print(delta);
     Serial.print(") ");
     switch (level) {
-      case 0: Serial.println("SAFE");   break;
-      case 1: Serial.println("LOW !");  break;
-      case 2: Serial.println("MID !!"); break;
-      case 3: Serial.println("HIGH !!!"); break;
+      case 0: Serial.print("SAFE");   break;
+      case 1: Serial.print("LOW !");  break;
+      case 2: Serial.print("MID !!"); break;
+      case 3: Serial.print("HIGH !!!"); break;
+    }
+
+    pinMode(ONE_WIRE_BUS, INPUT_PULLUP);
+    sensors.requestTemperatures();
+    pinMode(ONE_WIRE_BUS, INPUT_PULLUP);
+    float tempC = sensors.getTempCByIndex(0);
+    if (tempC != DEVICE_DISCONNECTED_C) {
+      Serial.print("  Temp:");
+      Serial.print(tempC);
+      Serial.println(" C");
+    } else {
+      Serial.println("  Temp: N/A");
     }
     lastPrint = millis();
   }

@@ -288,25 +288,32 @@ async def list_examples():
         return {"examples": []}
     items = []
     for entry in sorted(os.listdir(EXAMPLES_DIR)):
-        d = os.path.join(EXAMPLES_DIR, entry)
-        if os.path.isdir(d):
-            ino_file = os.path.join(d, f"{entry}.ino")
+        full = os.path.join(EXAMPLES_DIR, entry)
+        if os.path.isdir(full):
+            ino_file = os.path.join(full, f"{entry}.ino")
             if os.path.isfile(ino_file):
                 items.append({"name": entry, "file": f"{entry}.ino"})
+        elif entry.endswith(".ino"):
+            name = entry[:-4]
+            items.append({"name": name, "file": entry})
     return {"examples": items}
 
 
 @app.get("/api/examples/{name}")
 async def get_example(name: str):
+    ino_file = os.path.join(EXAMPLES_DIR, f"{name}.ino")
+    if os.path.isfile(ino_file):
+        with open(ino_file, "r") as f:
+            content = f.read()
+        return {"success": True, "name": name, "content": content}
     d = os.path.join(EXAMPLES_DIR, name)
-    if not os.path.isdir(d):
-        return {"success": False, "error": f"Example '{name}' not found"}
-    ino_file = os.path.join(d, f"{name}.ino")
-    if not os.path.isfile(ino_file):
-        return {"success": False, "error": f"No .ino file in example '{name}'"}
-    with open(ino_file, "r") as f:
-        content = f.read()
-    return {"success": True, "name": name, "content": content}
+    if os.path.isdir(d):
+        ino_file = os.path.join(d, f"{name}.ino")
+        if os.path.isfile(ino_file):
+            with open(ino_file, "r") as f:
+                content = f.read()
+            return {"success": True, "name": name, "content": content}
+    return {"success": False, "error": f"Example '{name}' not found"}
 
 
 @app.post("/api/compile")

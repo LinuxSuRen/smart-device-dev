@@ -61,6 +61,7 @@
           <tr class="sep"><td colspan="2">Code Editor</td></tr>
           <tr><td><kbd>Ctrl</kbd> + <kbd>Enter</kbd></td><td>Verify / Compile</td></tr>
           <tr><td><kbd>Ctrl</kbd> + <kbd>U</kbd></td><td>Upload</td></tr>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>U</kbd></td><td>Compile & Upload</td></tr>
           <tr><td><kbd>Ctrl</kbd> + <kbd>O</kbd></td><td>Focus Example Loader</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Close Build Output</td></tr>
           <tr class="sep"><td colspan="2">Serial Monitor</td></tr>

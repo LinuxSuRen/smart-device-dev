@@ -15,8 +15,15 @@
         <option v-for="ex in examples" :key="ex.name" :value="ex.name">{{ ex.name }}</option>
       </select>
       <div class="toolbar-spacer"></div>
-      <button class="btn-action" @click="compile" :disabled="compiling">
+      <button class="btn-action" @click="compile" :disabled="compiling || uploading">
         {{ compiling ? 'Compiling...' : 'Verify' }} <kbd>^Enter</kbd>
+      </button>
+      <button
+        class="btn-action btn-compile-upload"
+        @click="compileAndUpload"
+        :disabled="compiling || uploading || !selectedPort"
+      >
+        {{ compiling ? 'Compiling...' : uploading ? 'Uploading...' : 'Compile & Upload' }} <kbd>^S U</kbd>
       </button>
       <button class="btn-action primary" @click="upload" :disabled="compiling || uploading || !selectedPort">
         {{ uploading ? 'Uploading...' : 'Upload' }} <kbd>^U</kbd>
@@ -135,6 +142,10 @@ export default {
             {
               key: 'Ctrl-u',
               run() { vm.upload(); return true }
+            },
+            {
+              key: 'Ctrl-Shift-u',
+              run() { vm.compileAndUpload(); return true }
             }
           ]),
           EditorView.updateListener.of(() => {
@@ -210,6 +221,29 @@ export default {
       } finally {
         this.uploading = false
       }
+    },
+    async compileAndUpload() {
+      this.compiling = true
+      this.uploading = false
+      this.output = null
+      try {
+        const compileRes = await compileCode(this.getCode(), this.boardFqbn)
+        if (!compileRes.success) {
+          this.output = { success: false, text: compileRes.error || compileRes.output }
+          this.compiling = false
+          return
+        }
+        this.output = { success: true, text: 'Compile OK. Uploading...' }
+        this.compiling = false
+        this.uploading = true
+        const uploadRes = await uploadCode(this.getCode(), this.boardFqbn, this.selectedPort)
+        this.output = { success: uploadRes.success, text: uploadRes.success ? uploadRes.output : (uploadRes.error || uploadRes.output) }
+      } catch (e) {
+        this.output = { success: false, text: 'Failed to connect to backend' }
+      } finally {
+        this.uploading = false
+        this.compiling = false
+      }
     }
   }
 }
@@ -275,6 +309,17 @@ export default {
 }
 .btn-action.primary kbd {
   background: #1b5a2a;
+}
+.btn-compile-upload {
+  background: #1f6feb;
+  color: #fff;
+  border-color: #388bfd;
+}
+.btn-compile-upload:hover:not(:disabled) {
+  background: #388bfd;
+}
+.btn-compile-upload kbd {
+  background: #1c4d9e;
 }
 .editor-pane {
   flex: 1;
